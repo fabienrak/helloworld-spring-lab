@@ -25,26 +25,51 @@ jobs:
       - name: Build backend JAR
         run: mvn clean package -DskipTests
 
-      # 4️⃣ Deploy to VPS
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v0.1.9
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT }}
-          script: |
-            echo "✅ Pull latest code and copy JAR..."
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+        run: |
+          echo "✅ Décodage de la clé SSH..."
+          echo "$VPS_SSH_KEY" | base64 -d > deploy_key.pem
+          chmod 600 deploy_key.pem
+
+          echo "✅ Copie du JAR vers le serveur..."
+          scp -i deploy_key.pem -o StrictHostKeyChecking=no -P $VPS_SSH_PORT ./target/helloworld-0.0.1-SNAPSHOT.jar $VPS_USER@$VPS_HOST:/var/www/srv/api/helloWorld/target/
+
+          echo "✅ Redémarrage Docker sur le serveur..."
+          ssh -i deploy_key.pem -o StrictHostKeyChecking=no -p $VPS_SSH_PORT $VPS_USER@$VPS_HOST << 'EOF'
             cd /var/www/srv/api/helloWorld
-
-            # Supprimer l'ancien JAR
-            rm -f target/*.jar
-
-            # Copier le JAR depuis GitHub Actions
-            scp -i ${{ secrets.VPS_SSH_KEY }} ./target/helloworld-0.0.1-SNAPSHOT.jar root@${{ secrets.VPS_HOST }}:/var/www/srv/api/helloWorld/target/
-
-            echo "✅ Rebuild et relance des containers Docker..."
             docker compose down
             docker compose up -d --build
+          EOF
 
-            echo "🎉 Déploiement backend terminé !"
+          rm -f deploy_key.pem
+          echo "🎉 Déploiement terminé !"
+
+
+      # 4️⃣ Deploy to VPS
+      # - name: Deploy to VPS
+      #   uses: appleboy/ssh-action@v0.1.9
+      #   with:
+      #     host: ${{ secrets.VPS_HOST }}
+      #     username: ${{ secrets.VPS_USER }}
+      #     key: ${{ secrets.VPS_SSH_KEY }}
+      #     port: ${{ secrets.VPS_SSH_PORT }}
+      #     script: |
+      #       echo "✅ Pull latest code and copy JAR..."
+      #       cd /var/www/srv/api/helloWorld
+
+      #       # Supprimer l'ancien JAR
+      #       rm -f target/*.jar
+
+      #       # Copier le JAR depuis GitHub Actions
+      #       scp -i ${{ secrets.VPS_SSH_KEY }} ./target/helloworld-0.0.1-SNAPSHOT.jar root@${{ secrets.VPS_HOST }}:/var/www/srv/api/helloWorld/target/
+
+      #       echo "✅ Rebuild et relance des containers Docker..."
+      #       docker compose down
+      #       docker compose up -d --build
+
+      #       echo "🎉 Déploiement backend terminé !"
