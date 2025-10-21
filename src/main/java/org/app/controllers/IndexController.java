@@ -15,6 +15,11 @@ public class IndexController {
         return "################## hELLo WORLLD #########################";
     }
 
+    @GetMapping("lorem")
+    public String sayLorem(){
+        return "lorem ipsum dolorr sit ammet ....";
+    }
+
     @GetMapping("addition/{x}/{y}")
     public Integer addNumber(@PathVariable Integer x, @PathVariable Integer y){
 
