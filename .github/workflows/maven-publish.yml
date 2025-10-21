@@ -1,0 +1,50 @@
+name: Backend Deploy (DEV)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout le code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Setup Java 21
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # 3️⃣ Build Spring Boot backend
+      - name: Build backend JAR
+        run: mvn clean package -DskipTests
+
+      # 4️⃣ Deploy to VPS
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script: |
+            echo "✅ Pull latest code and copy JAR..."
+            cd /var/www/srv/api/helloWorld
+
+            # Supprimer l'ancien JAR
+            rm -f target/*.jar
+
+            # Copier le JAR depuis GitHub Actions
+            scp -i ${{ secrets.VPS_SSH_KEY }} ./target/helloworld-0.0.1-SNAPSHOT.jar root@${{ secrets.VPS_HOST }}:/var/www/srv/api/helloWorld/target/
+
+            echo "✅ Rebuild et relance des containers Docker..."
+            docker compose down
+            docker compose up -d --build
+
+            echo "🎉 Déploiement backend terminé !"
